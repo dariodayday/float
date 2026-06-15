@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Float — find your night</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Landing / opening animation -->
+  <section id="landing" class="landing">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="floaties" aria-hidden="true">
+      <span style="--i:0">🍸</span>
+      <span style="--i:1">🎳</span>
+      <span style="--i:2">🎢</span>
+      <span style="--i:3">🎤</span>
+      <span style="--i:4">🥾</span>
+      <span style="--i:5">🍔</span>
+      <span style="--i:6">🎮</span>
+      <span style="--i:7">🎬</span>
+    </div>
+
+    <div class="hero">
+      <h1 class="brand" id="brand" aria-label="Float">
+        <span class="ltr" style="--sx:-82vw; --sy:-12vh; --ax:-1.5em; --ay:-.55em; --rot:-12deg;"><span class="perf perf-f"><i class="act act-glass">🍸</i><b class="g">F</b></span></span>
+        <span class="ltr" style="--sx:0; --sy:94vh; --ax:-.7em; --ay:.7em; --rot:9deg;"><span class="perf perf-l"><i class="act barbell"></i><b class="g">l</b></span></span>
+        <span class="ltr" style="--sx:6vw; --sy:-94vh; --ax:0; --ay:-.85em; --rot:-6deg;"><i class="act act-ball">🏀</i><span class="perf perf-o"><b class="g">o</b></span></span>
+        <span class="ltr" style="--sx:84vw; --sy:8vh; --ax:.8em; --ay:.6em; --rot:11deg;"><span class="perf perf-a"><i class="act act-mic">🎤</i><b class="g">a</b></span></span>
+        <span class="ltr" style="--sx:64vw; --sy:92vh; --ax:1.55em; --ay:-.5em; --rot:-10deg;"><span class="perf perf-t"><i class="act act-boot">🥾</i><b class="g">t</b></span></span>
+      </h1>
+      <p class="sub">Where we floating today?</p>
+      <button id="start" class="cta">Start floating →</button>
+      <p class="hint">For your crew • real spots near you</p>
+    </div>
+  </section>
+
+  <!-- The planner -->
+  <div id="app" class="app hidden">
+    <header>
+      <h1>Float</h1>
+      <p class="tagline">Where we floating today?</p>
+    </header>
+
+    <main>
+      <div id="chat" class="chat" aria-live="polite"></div>
+      <div id="composer" class="composer"></div>
+    </main>
+
+    <footer>
+      <span>Float · Prototype v4.9</span>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
