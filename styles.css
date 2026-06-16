@@ -14,6 +14,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Dark all the way to the edges — stops white showing on phone overscroll/bounce */
+html { background: #0d0d12; }
+
 /* ===== Landing / opening animation ===== */
 .landing {
   position: fixed;
