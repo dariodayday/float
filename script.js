@@ -675,6 +675,54 @@ function reasonFor(act, people, duration) {
 let resultsWrap = null;
 let lastDecide = null; // { shown, map, transport } for the "Decide for us" button
 
+// ----- Saved spots (favorites) in localStorage -----
+const FAV_KEY = "float_favs";
+const favKey = (sp) => `${sp.name}@${(+sp.lat).toFixed(4)},${(+sp.lon).toFixed(4)}`;
+function getFavs() { try { return JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch (e) { return []; } }
+function isFav(sp) { return getFavs().some((f) => favKey(f) === favKey(sp)); }
+function toggleFav(sp) {
+  const favs = getFavs();
+  const i = favs.findIndex((f) => favKey(f) === favKey(sp));
+  if (i >= 0) favs.splice(i, 1);
+  else favs.push({ name: sp.name, sel: sp.sel, lat: sp.lat, lon: sp.lon });
+  localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+  return i < 0; // true if now saved
+}
+
+// ----- Share a spot (native share on mobile, clipboard fallback) -----
+function shareSpot(sp) {
+  const dir = `https://www.google.com/maps/dir/?api=1&destination=${sp.lat},${sp.lon}`;
+  const info = PIN_INFO[sp.sel] || { label: selLabel(sp.sel) };
+  const text = `Let's go to ${sp.name} (${info.label.toLowerCase()}) — found on Float 🎈`;
+  if (navigator.share) {
+    navigator.share({ title: sp.name, text, url: dir }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(`${text}\n${dir}`).then(() => toast("Copied — paste it in the group chat!"), () => toast(dir));
+  } else {
+    toast(dir);
+  }
+}
+
+// ----- Tiny toast -----
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 2400);
+}
+
+function showSaved() {
+  const favs = getFavs();
+  if (!favs.length) { toast("No saved spots yet — tap ♡ on a spot."); return; }
+  const rows = favs.map((f) => {
+    const dir = `https://www.google.com/maps/dir/?api=1&destination=${f.lat},${f.lon}`;
+    return `<div class="saved-row"><span>${PIN_EMOJI[f.sel] || "📍"} <b>${f.name}</b> <span class="cat">${selLabel(f.sel)}</span></span><a href="${dir}" target="_blank" rel="noopener">Directions →</a></div>`;
+  }).join("");
+  aiSay(`❤️ Your saved spots:<div class="saved">${rows}</div>`, () => showControls());
+}
+
 function buildCards(picks, a) {
   const people = a.people;
   const cards = picks.map(({ act }, i) => {
@@ -911,9 +959,10 @@ async function renderMap(a, selectors) {
 
   // Spots are ready — NOW build the map.
   bubble.classList.add("map-bubble");
-  bubble.innerHTML = `<div class="map" id="map"></div><div class="map-note"></div><div class="venues"></div>`;
+  bubble.innerHTML = `<div class="map" id="map"></div><div class="map-note"></div><div class="filters"></div><div class="venues"></div>`;
   const note = bubble.querySelector(".map-note");
   const list = bubble.querySelector(".venues");
+  const filters = bubble.querySelector(".filters");
 
   const map = L.map(bubble.querySelector("#map"), { zoomControl: true, scrollWheelZoom: false }).setView([center.lat, center.lon], 14);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
@@ -949,19 +998,57 @@ async function renderMap(a, selectors) {
       .bindPopup(`<b>${sp.name}</b><br>${info.label}${price} · ${away}<br>${info.desc}<br><a href="${dir}" target="_blank" rel="noopener">Directions →</a>`);
     bounds.push([sp.lat, sp.lon]);
 
-    const item = document.createElement("button");
+    const saved = isFav(sp);
+    const item = document.createElement("div");
     item.className = "venue";
-    item.innerHTML = `<span class="vemoji">${PIN_EMOJI[sp.sel] || "📍"}</span>
-      <span class="vbody"><span class="vname">${sp.name}</span><span class="vmeta">${selLabel(sp.sel)} · ${away}</span></span>
-      <span class="vgo">→</span>`;
-    item.addEventListener("click", () => {
+    item.innerHTML = `
+      <button class="vmain">
+        <span class="vemoji">${PIN_EMOJI[sp.sel] || "📍"}</span>
+        <span class="vbody"><span class="vname">${sp.name}</span><span class="vmeta">${selLabel(sp.sel)} · ${away}</span></span>
+      </button>
+      <button class="vact vfav${saved ? " on" : ""}" aria-label="Save spot">${saved ? "♥" : "♡"}</button>
+      <button class="vact vshare" aria-label="Share spot">⤴</button>`;
+    item.querySelector(".vmain").addEventListener("click", () => {
       map.setView([sp.lat, sp.lon], 16, { animate: true });
       sp.marker.openPopup();
       bubble.querySelector(".map").scrollIntoView({ behavior: "smooth", block: "center" });
     });
+    const favBtn = item.querySelector(".vfav");
+    favBtn.addEventListener("click", () => {
+      const now = toggleFav(sp);
+      favBtn.classList.toggle("on", now);
+      favBtn.textContent = now ? "♥" : "♡";
+      toast(now ? "Saved ♥" : "Removed");
+    });
+    item.querySelector(".vshare").addEventListener("click", () => shareSpot(sp));
     sp.item = item;
     list.appendChild(item);
   });
+
+  // Type filters — toggle which kinds of spots show (chips + map pins)
+  const sels = [...new Set(shown.map((s) => s.sel))];
+  const active = new Set(sels);
+  function applyFilter() {
+    shown.forEach((sp) => {
+      const on = active.has(sp.sel);
+      sp.item.style.display = on ? "" : "none";
+      if (on && !map.hasLayer(sp.marker)) sp.marker.addTo(map);
+      else if (!on && map.hasLayer(sp.marker)) map.removeLayer(sp.marker);
+    });
+  }
+  if (sels.length > 1) {
+    sels.forEach((sel) => {
+      const chip = document.createElement("button");
+      chip.className = "fchip on";
+      chip.innerHTML = `${PIN_EMOJI[sel] || "📍"} ${selLabel(sel)}`;
+      chip.addEventListener("click", () => {
+        if (active.has(sel) && active.size > 1) { active.delete(sel); chip.classList.remove("on"); }
+        else { active.add(sel); chip.classList.add("on"); }
+        applyFilter();
+      });
+      filters.appendChild(chip);
+    });
+  }
 
   lastDecide = { shown, map, transport: a.transport };
 
@@ -1037,6 +1124,15 @@ function showControls(opts = {}) {
   });
   row.appendChild(restart);
   composerEl.appendChild(row);
+
+  if (getFavs().length) {
+    const saved = document.createElement("button");
+    saved.className = "btn";
+    saved.style.width = "100%";
+    saved.textContent = `❤️ Saved spots (${getFavs().length})`;
+    saved.addEventListener("click", showSaved);
+    composerEl.appendChild(saved);
+  }
 }
 
 // ===== Go =====
